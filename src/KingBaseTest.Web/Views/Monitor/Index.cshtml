@@ -203,15 +203,13 @@
             // Sort IPs for consistent display
             var sortedIps = Object.keys(lbStats).sort();
 
-            sortedIps.forEach(function(key) {
+            sortedIps.forEach(function(key, i) {
                 var count = lbStats[key];
                 var pct = Math.round((count / lbTotal) * 100);
                 
-                // Assign different colors based on IP last digit or hash (simple rotation here)
-                var colorClass = "bg-primary"; 
-                if (key.endsWith("65")) colorClass = "bg-info";
-                else if (key.endsWith("66")) colorClass = "bg-warning";
-                else if (key.endsWith("64")) colorClass = "bg-success";
+                // 按排序后的下标轮转配色（不依赖具体 IP，节点数可任意）
+                var palette = ["bg-success", "bg-info", "bg-warning", "bg-primary", "bg-danger"];
+                var colorClass = palette[i % palette.length];
 
                 var html = `
                     <div class="mb-2">
