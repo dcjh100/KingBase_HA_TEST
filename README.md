@@ -212,3 +212,11 @@ docker exec -it <container> nc -zv host.docker.internal 14321    # 容器侧：�
 
 - 本仓库为内网验证环境代码的**脱敏副本**：真实 IP、账号口令、镜像仓库与内部发布配置均已移除或替换为占位值，Git 历史亦重建为单条提交。
 - `.claude/skills` 下的第三方技能包未纳入本仓库，需要时执行 `npx openskills add anthropics/skills` 重新加载，见 [`skills/OpenSkillsIntegration.md`](skills/OpenSkillsIntegration.md)。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 授权，Copyright (c) 2026 jianghua。
+
+`src/KingBaseTest.Web/wwwroot/lib` 下为第三方前端库（Bootstrap、jQuery、jQuery Validation、jQuery Validation Unobtrusive），均为 MIT 许可，各自遵循其随附的原始许可证文件。
+
+> 金仓 KingbaseES 及其官方驱动（`Kdbndp` / `Kdbndp_V9`）为北京人大金仓信息技术股份有限公司的产品，不在本许可证覆盖范围内，其使用需遵守厂商自身许可协议。
