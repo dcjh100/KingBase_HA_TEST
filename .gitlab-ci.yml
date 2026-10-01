@@ -1,0 +1,55 @@
+image: docker:24
+
+services:
+  - name: docker:24.0.7-dind
+    command: ["--mtu=1460"]
+
+variables:
+  DOCKER_IMAGE_NAME: kingbasetest
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  GIT_SSL_NO_VERIFY: "true"
+  GIT_DEPTH: 1
+  # 版本正则
+  VERSION_REGEX: '/^v\d+\.\d+\.\d+-(dev|alpha|beta|rc)\d{2}/'
+
+stages:
+  - build
+  - release
+
+# ============================================
+# 构建阶段
+# ============================================
+
+docker-build:
+  stage: build
+  tags: 
+    - $RUNNER_NAME
+  before_script:
+    - docker login -u "$HARBOR_USER" -p "$HARBOR_PASSWORD" harbor.example.com
+  script:
+    - |
+      VERSION=$(echo "$CI_COMMIT_TAG" | cut -c 2- | cut -d '-' -f 1)
+      GIT_SHORT_HASH=$(echo $CI_COMMIT_SHA | cut -c1-7)
+      echo "版本号：$VERSION, Git Hash：$GIT_SHORT_HASH"
+       # 构建镜像
+      BUILD_IMG="$DOCKER_IMAGE_NAME:$VERSION"
+      docker build -t $BUILD_IMG .
+      # 打标签：版本号、版本号+hash、latest
+      docker tag $BUILD_IMG harbor.example.com/xc/$BUILD_IMG
+      docker tag $BUILD_IMG harbor.example.com/xc/$BUILD_IMG-$GIT_SHORT_HASH
+      docker tag $BUILD_IMG harbor.example.com/xc/$DOCKER_IMAGE_NAME:latest
+      # 推送所有标签
+      docker push harbor.example.com/xc/$BUILD_IMG
+      docker push harbor.example.com/xc/$BUILD_IMG-$GIT_SHORT_HASH
+      docker push harbor.example.com/xc/$DOCKER_IMAGE_NAME:latest
+      # 推本地镜像仓库
+      echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+      docker tag $BUILD_IMG $CI_REGISTRY_IMAGE/$BUILD_IMG
+      docker tag $BUILD_IMG $CI_REGISTRY_IMAGE/$BUILD_IMG-$GIT_SHORT_HASH
+      docker tag $BUILD_IMG $CI_REGISTRY_IMAGE/$DOCKER_IMAGE_NAME:latest
+      docker push $CI_REGISTRY_IMAGE/$BUILD_IMG
+      docker push $CI_REGISTRY_IMAGE/$BUILD_IMG-$GIT_SHORT_HASH
+      docker push $CI_REGISTRY_IMAGE/$DOCKER_IMAGE_NAME:latest 
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-(dev|alpha|beta|rc)\d{2}/

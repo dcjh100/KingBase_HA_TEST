@@ -1,0 +1,41 @@
+{
+  "mcpServers": {
+    "composio": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "composio-core",
+        "serve"
+      ],
+      "env": {
+        "COMPOSIO_API_KEY": "<在此处填入您的 Composio API Key>"
+      },
+      "description": "用于支持 connect 和 connect-apps skill，连接 GitHub, Slack, Gmail 等外部应用",
+      "disabled": true
+    },
+    "langsmith": {
+      "command": "python",
+      "args": [
+        "-m",
+        "langsmith_fetch.mcp_server"
+      ],
+      "env": {
+        "LANGSMITH_API_KEY": "<在此处填入您的 LangSmith API Key>",
+        "LANGSMITH_PROJECT": "<您的项目名称>"
+      },
+      "description": "用于 langsmith-fetch skill，调试 Agent 执行轨迹 (需先 pip install langsmith-fetch)",
+      "disabled": true
+    }
+  },
+  "notes": {
+    "usage": "请将上述 mcpServers 节点的内容复制到您的 Trae 或 VS Code 的 settings.json 文件中。",
+    "skills_analysis": {
+      "connect": "需要 Composio MCP Server",
+      "connect-apps": "需要 Composio MCP Server",
+      "langsmith-fetch": "需要 LangSmith 环境或 MCP Server",
+      "pdf": "使用 Python 库 (pypdf等)，无需独立 MCP Server",
+      "xlsx": "使用 Python 库 (pandas等)，无需独立 MCP Server",
+      "algorithmic-art": "使用前端技术生成，无需独立 MCP Server"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  kingbasetest-web:
+    image: kingbasetest-web
+    build:
+      context: .
+      dockerfile: src/KingBaseTest.Web/Dockerfile
+    ports:
+      - "18080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # [配置说明] 使用 netsh 端口转发方案
+      # 容器通过 host.docker.internal 连接宿主机，宿主机通过 netsh portproxy 转发到真实数据库 IP
+      - ConnectionStrings__KingBaseHAConnection=Server=host.docker.internal:14321,host.docker.internal:14322,host.docker.internal:14323;Database=test;User Id=kbuser;Password=your_password;TargetSessionAttributes=Primary;LoadBalanceHosts=true;
+      - ConnectionStrings__KingBaseHAReadConnection=Server=host.docker.internal:14321,host.docker.internal:14322,host.docker.internal:14323;Database=test;User Id=kbuser;Password=your_password;TargetSessionAttributes=Standby;LoadBalanceHosts=true;
+      
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    networks:
+      - kingbasetest_net
+
+networks:
+  kingbasetest_net:
+    driver: bridge
+    ipam:
+      config:
+        # 强制指定一个独立网段，防止路由冲突
+        - subnet: 10.100.0.0/16

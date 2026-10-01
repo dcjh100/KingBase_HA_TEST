@@ -1,0 +1,231 @@
+@{
+    ViewData["Title"] = "Kingbase High Availability Monitor";
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-speedometer2"></i> Kingbase HA Monitor</h2>
+        <div class="d-flex gap-2 align-items-center">
+            <label>频率 (ms):</label>
+            <input type="number" id="intervalInput" class="form-control" value="1000" style="width: 100px;">
+            <button id="btnStart" class="btn btn-success" onclick="startAllMonitors()"><i class="bi bi-play-fill"></i> 启动监控</button>
+            <button id="btnStop" class="btn btn-danger d-none" onclick="stopAllMonitors()"><i class="bi bi-stop-fill"></i> 停止监控</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Primary Node Panel -->
+        <div class="col-md-4">
+            <div class="card border-primary h-100">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Primary (Read/Write)</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-light text-primary py-0" onclick="checkChannel('primary', 'primary')" title="单步执行">
+                            <i class="bi bi-play-fill"></i> 单步
+                        </button>
+                        <span id="badge-primary" class="badge bg-secondary">Waiting</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Server IP:</strong> <span id="ip-primary" class="text-primary fs-4">---</span><br>
+                        <strong>Read Only:</strong> <span id="readonly-primary">---</span><br>
+                        <strong>Latency:</strong> <span id="latency-primary">---</span> ms
+                    </div>
+                    <hr>
+                    <h6>Live Logs:</h6>
+                    <div id="log-primary" class="bg-light p-2 border rounded" style="height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.8rem;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Standby Node Panel -->
+        <div class="col-md-4">
+            <div class="card border-info h-100">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Standby (Read Only)</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-light text-info py-0" onclick="checkChannel('standby', 'standby')" title="单步执行">
+                            <i class="bi bi-play-fill"></i> 单步
+                        </button>
+                        <span id="badge-standby" class="badge bg-secondary">Waiting</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Server IP:</strong> <span id="ip-standby" class="text-info fs-4">---</span><br>
+                        <strong>Read Only:</strong> <span id="readonly-standby">---</span><br>
+                        <strong>Latency:</strong> <span id="latency-standby">---</span> ms
+                    </div>
+                    <hr>
+                    <h6>Live Logs:</h6>
+                    <div id="log-standby" class="bg-light p-2 border rounded" style="height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.8rem;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Load Balance Panel -->
+        <div class="col-md-4">
+            <div class="card border-warning h-100">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Load Balance (No Pool)</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-dark text-warning py-0" onclick="checkChannel('loadbalance', 'loadbalance')" title="单步执行">
+                            <i class="bi bi-play-fill"></i> 单步
+                        </button>
+                        <span id="badge-loadbalance" class="badge bg-secondary">Waiting</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Server IP:</strong> <span id="ip-loadbalance" class="text-warning fs-4">---</span><br>
+                        <strong>Read Only:</strong> <span id="readonly-loadbalance">---</span><br>
+                        <strong>Latency:</strong> <span id="latency-loadbalance">---</span> ms
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>IP Distribution:</h6>
+                        <div id="lb-stats-container">
+                            <!-- Progress bars will be injected here -->
+                            <small class="text-muted">Waiting for data...</small>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h6>Live Logs:</h6>
+                    <div id="log-loadbalance" class="bg-light p-2 border rounded" style="height: 180px; overflow-y: auto; font-family: monospace; font-size: 0.8rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        var monitorIntervalId = null;
+        var lbStats = {}; // { "192.0.2.21": 10, "192.0.2.22": 5 }
+        var lbTotal = 0;
+
+        function startAllMonitors() {
+            var ms = parseInt($("#intervalInput").val()) || 1000;
+            if (ms < 100) ms = 100;
+
+            $("#btnStart").addClass("d-none");
+            $("#btnStop").removeClass("d-none");
+            $("#intervalInput").prop("disabled", true);
+
+            // Clear previous stats
+            lbStats = {};
+            lbTotal = 0;
+            $("#lb-stats-container").html('<small class="text-muted">Collecting data...</small>');
+            $(".bg-light").html(''); // Clear logs
+
+            monitorIntervalId = setInterval(function() {
+                checkChannel('primary', 'primary');
+                checkChannel('standby', 'standby');
+                checkChannel('loadbalance', 'loadbalance');
+            }, ms);
+        }
+
+        function stopAllMonitors() {
+            if (monitorIntervalId) {
+                clearInterval(monitorIntervalId);
+                monitorIntervalId = null;
+            }
+            $("#btnStart").removeClass("d-none");
+            $("#btnStop").addClass("d-none");
+            $("#intervalInput").prop("disabled", false);
+        }
+
+        function checkChannel(mode, suffix) {
+            $.ajax({
+                url: '/Monitor/CheckHealth',
+                data: { mode: mode },
+                success: function(res) {
+                    if (res.success) {
+                        updatePanel(suffix, res.data, true);
+                        if (mode === 'loadbalance') {
+                            updateLBStats(res.data.serverIp);
+                        }
+                    } else {
+                        updatePanel(suffix, { error: "DB Error: " + res.error }, false);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    var msg = "App Error: ";
+                    if (xhr.status === 0) {
+                        msg += "Network Unreachable";
+                    } else {
+                        msg += xhr.status + " " + error;
+                    }
+                    updatePanel(suffix, { error: msg }, false);
+                }
+            });
+        }
+
+        function updatePanel(suffix, data, isSuccess) {
+            var badge = $("#badge-" + suffix);
+            var logDiv = $("#log-" + suffix);
+            var timestamp = new Date().toLocaleTimeString();
+
+            if (isSuccess) {
+                badge.removeClass("bg-secondary bg-danger").addClass("bg-success").text("OK");
+                
+                $("#ip-" + suffix).text(data.serverIp);
+                $("#readonly-" + suffix).text(data.isReadOnly);
+                $("#latency-" + suffix).text(data.elapsedMs);
+
+                // Add log entry
+                var logEntry = `<div>[${timestamp}] <span class="text-success">OK</span> IP:${data.serverIp} (${data.elapsedMs}ms)</div>`;
+                logDiv.prepend(logEntry);
+            } else {
+                badge.removeClass("bg-secondary bg-success").addClass("bg-danger").text("ERR");
+                var logEntry = `<div>[${timestamp}] <span class="text-danger">ERR</span> ${data.error}</div>`;
+                logDiv.prepend(logEntry);
+            }
+
+            // Keep only last 50 logs
+            if (logDiv.children().length > 50) {
+                logDiv.children().last().remove();
+            }
+        }
+
+        function updateLBStats(ip) {
+            if (!ip) return;
+
+            if (!lbStats[ip]) lbStats[ip] = 0;
+            lbStats[ip]++;
+            lbTotal++;
+
+            var container = $("#lb-stats-container");
+            container.empty();
+
+            // Sort IPs for consistent display
+            var sortedIps = Object.keys(lbStats).sort();
+
+            sortedIps.forEach(function(key) {
+                var count = lbStats[key];
+                var pct = Math.round((count / lbTotal) * 100);
+                
+                // Assign different colors based on IP last digit or hash (simple rotation here)
+                var colorClass = "bg-primary"; 
+                if (key.endsWith("65")) colorClass = "bg-info";
+                else if (key.endsWith("66")) colorClass = "bg-warning";
+                else if (key.endsWith("64")) colorClass = "bg-success";
+
+                var html = `
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small">
+                            <span>${key}</span>
+                            <span>${count} (${pct}%)</span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar ${colorClass}" role="progressbar" style="width: ${pct}%" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                `;
+                container.append(html);
+            });
+        }
+    </script>
+}
