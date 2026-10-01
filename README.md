@@ -159,6 +159,43 @@ Windows 下 Docker 不支持 `network_mode: host`，容器内无法直连宿主�
 
 详见 [`skills/DockerNetshProxy.md`](skills/DockerNetshProxy.md)。
 
+## 常见问题
+
+### Q1. `LoadBalanceHosts=true`，为什么每次都连到同一个 IP？
+
+**现象**：Load Balance 通道的分布条长期 100% 压在同一个节点上，IP 不跳变，看起来像负载均衡没生效。
+
+**原因**：驱动默认开启**连接池**。首次连接某节点成功后，该连接被放回池中；后续请求直接从池里复用，**不会重新执行主机选择逻辑**，因此看不到 IP 变化。这是设计行为，不是故障。
+
+**验证办法**（仅测试用）：在连接串中追加 `Pooling=false` 禁用连接池，或在每次连接后调用 `ClearPool`：
+
+```
+Server=HOST1:14321,HOST2:14322,HOST3:14323;Database=...;UID=...;PWD=...;Pooling=false;
+```
+
+本项目的 **Load Balance 通道正是这样做的** —— 它在只读连接串基础上动态追加 `Pooling=false`，把真实的多节点分发行为暴露出来；而 Primary / Standby 通道保持连接池开启，贴合生产用法。
+
+**生产建议**：保持连接池开启（默认）。负载均衡会在连接池创建新连接时（并发上升、旧连接过期重连）自然生效。
+
+详见 [`skills/KingbaseHA_NpgsqlMode.md`](skills/KingbaseHA_NpgsqlMode.md) 第 5 节。
+
+### Q2. 三个节点端口相同，怎么确认到底连到了哪一台？
+
+`inet_server_port()` 返回的是**数据库实例端口**，多节点往往一致，无法据此区分；必须看 `inet_server_addr()`。看板与集成测试都以后者为准。
+
+若连接经过代理 / 端口转发，`inet_server_addr()` 返回的是**后端物理地址**而非代理地址。两者对应关系见 [`skills/KingbaseNetworkInfo.md`](skills/KingbaseNetworkInfo.md)。
+
+### Q3. 容器里连不上数据库
+
+Windows 下 Docker Desktop 不支持 `network_mode: host`，容器无法直接路由到宿主机所在网段的数据库 IP，需在宿主机做 `netsh interface portproxy` 转发并确认防火墙放行。排查顺序：
+
+```powershell
+Test-NetConnection localhost -Port 14321                          # 宿主机侧：转发是否生效
+docker exec -it <container> nc -zv host.docker.internal 14321    # 容器侧：是否可达
+```
+
+细节见上文「容器网络」一节与 [`skills/DockerNetshProxy.md`](skills/DockerNetshProxy.md)。
+
 ## 文档
 
 | 文档 | 内容 |
